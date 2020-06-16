@@ -178,9 +178,13 @@ class AddByConstOp(Op):
 
     def infer_shape(self, node, input_shapes):
         """TODO: Your code here"""
+        return input_shapes[0]
 
     def compiled_func(self, node, input_shapes, tgt, tgt_host):
         """TODO: Your code here"""
+        return tvm_op.make_elemwise_add_by_const(
+            input_shapes[0], tgt, tgt_host, "elem_add_const"
+        )
 
 class MulOp(Op):
     def __call__(self, node_A, node_B):
@@ -200,9 +204,11 @@ class MulOp(Op):
     def infer_shape(self, node, input_shapes):
         """Need to handle input_vals[0].shape != input_vals[1].shape"""
         """TODO: Your code here"""
+        return broadcast_rule(input_shapes[0], input_shapes[1])
 
     def compiled_func(self, node, input_shapes, tgt, tgt_host):
         """TODO: Your code here"""
+        return tvm_op.make_elemwise_mul(input_shapes[0], tgt, tgt_host, "elem_mul")
 
 class MulByConstOp(Op):
     def __call__(self, node_A, const_val):
@@ -221,9 +227,11 @@ class MulByConstOp(Op):
 
     def infer_shape(self, node, input_shapes):
         """TODO: Your code here"""
+        return input_shapes[0]
 
     def compiled_func(self, node, input_shapes, tgt, tgt_host):
         """TODO: Your code here"""
+        return tvm_op.make_elemwise_mul(input_shapes[0], tgt, tgt_host, "elem_mul_by_const")
 
 class MatMulOp(Op):
     def __call__(self, node_A, node_B, trans_A=False, trans_B=False):
@@ -271,10 +279,22 @@ class MatMulOp(Op):
 
     def infer_shape(self, node, input_shapes):
         """TODO: Your code here"""
+        aw, ah = input_shapes[0]
+        bw, bh = input_shapes[1]
+        if not node.matmul_attr_trans_A and not node.matmul_attr_trans_B:
+            return [aw, bh]
+        if node.matmul_attr_trans_A and not node.matmul_attr_trans_B:
+            return [ah, bh]
+        if not node.matmul_attr_trans_A and node.matmul_attr_trans_B:
+            return [aw, bw]
+        if node.matmul_attr_trans_A and node.matmul_attr_trans_B:
+            return [ah, bw]
 
     def compiled_func(self, node, input_shapes, tgt, tgt_host):
         """TODO: Your code here"""
-        
+        return tvm_op.make_matrix_mul(input_shapes[0], node.matmul_attr_trans_A, input_shapes[1],
+                                      node.matmul_attr_trans_B, tgt, tgt_host=tgt_host, func_name="matmul")
+
 
 class PlaceholderOp(Op):
     def __call__(self):
@@ -313,6 +333,7 @@ class ZerosLikeOp(Op):
     def infer_shape(self, node, input_shapes):
         """If input_shape is a vector, simpler to return (1,)"""
         """TODO: Your code here"""
+        return input_shapes[0]
 
     def compiled_func(self, node, input_shapes, tgt, tgt_host):
         return None
@@ -337,6 +358,7 @@ class OnesLikeOp(Op):
     def infer_shape(self, node, input_shapes):
         """If input_shape is a vector, simpler to return (1,)"""
         """TODO: Your code here"""
+        return input_shapes[0]
 
     def compiled_func(self, node, input_shapes, tgt, tgt_host):
         return None
@@ -395,9 +417,11 @@ class BroadcastToOp(Op):
 
     def infer_shape(self, node, input_shapes):
         """TODO: Your code here"""
+        return input_shapes[1]
 
     def compiled_func(self, node, input_shapes, tgt, tgt_host):
         """TODO: Your code here"""
+        return tvm_op.make_broadcast_to(input_shapes[0], input_shapes[1], tgt, tgt_host, func_name="broadcast_to")
 
 def softmax_func(y):
     """Numerically stable softmax."""
@@ -428,9 +452,11 @@ class SoftmaxCrossEntropyOp(Op):
 
     def infer_shape(self, node, input_shapes):
         """TODO: Your code here"""
+        return (1, )
 
     def compiled_func(self, node, input_shapes, tgt, tgt_host):
         """TODO: Your code here"""
+        return tvm_op.make_matrix_softmax_cross_entropy(input_shapes[0], tgt, tgt_host, func_name="softmax_cross_entropy")
 
 class SoftmaxOp(Op):
     def __call__(self, node_A):
@@ -450,9 +476,11 @@ class SoftmaxOp(Op):
 
     def infer_shape(self, node, input_shapes):
         """TODO: Your code here"""
+        return input_shapes[0]
 
     def compiled_func(self, node, input_shapes, tgt, tgt_host):
         """TODO: Your code here"""
+        return tvm_op.make_matrix_softmax(input_shapes[0], tgt, tgt_host, func_name="cross_entropy")
 
 
 class ReluOp(Op):
@@ -470,9 +498,11 @@ class ReluOp(Op):
 
     def infer_shape(self, node, input_shapes):
         """TODO: Your code here"""
+        return input_shapes[0]
 
     def compiled_func(self, node, input_shapes, tgt, tgt_host):
         """TODO: Your code here"""
+        return tvm_op.make_relu(input_shapes[0], tgt, tgt_host, func_name="relu")
 
 
 class ReluGradientOp(Op):
@@ -491,9 +521,11 @@ class ReluGradientOp(Op):
 
     def infer_shape(self, node, input_shapes):
         """TODO: Your code here"""
+        return input_shapes[0]
 
     def compiled_func(self, node, input_shapes, tgt, tgt_host):
         """TODO: Your code here"""
+        return tvm_op.make_relu_gradient(input_shapes[0], tgt, tgt_host, func_name="relu_gradient")
 
 # Create global singletons of operators.
 add_op = AddOp()
@@ -608,7 +640,7 @@ class Executor(object):
             feed_shapes[node] = node_to_val_map[node].shape
 
         # infer shape if feed_shapes changed since last run
-        # e.g. call run() on test data after trainng
+        # e.g. call run() on test data after training
         if (not are_feed_shapes_equal(feed_shapes, self.feed_shapes)):
             self.infer_shape(feed_shapes)
             self.feed_shapes = feed_shapes
@@ -718,12 +750,12 @@ def broadcast_rule(shape_a, shape_b):
     else:
         longer_shape, shorter_shape = shape_b, shape_a
     len_diff = len(longer_shape) - len(shorter_shape)
-    for i in xrange(len_diff):
+    for i in range(len_diff):
         # pad with leading 1s
         shorter_shape = (1,) + shorter_shape
     assert len(shorter_shape) == len(longer_shape)
     output_shape = list(longer_shape)
-    for i in xrange(len(output_shape)):
+    for i in range(len(output_shape)):
         assert (shorter_shape[i] == longer_shape[i]) \
             or (shorter_shape[i] == 1) \
             or (longer_shape[i] == 1)

@@ -133,15 +133,15 @@ def test_conv2d():
       out_H = (H + 2 * padding - filter_H) / stride + 1
       out_W = (W + 2 * padding - filter_W) / stride + 1
 
-      y_row_size = C * filter_H * filter_W
-      y_col_size = out_H * out_W
+      y_row_size = int(C * filter_H * filter_W)
+      y_col_size = int(out_H * out_W)
       y_shape = (N, y_row_size, y_col_size)
       Y = np.empty(y_shape, dtype = X.dtype)
 
       for batch_index in range(N):
         for col_index in range(y_col_size):
-          out_y = col_index / out_W
-          out_x = col_index % out_W
+          out_y = int(col_index / out_W)
+          out_x = int(col_index % out_W)
           in_y = out_y * stride - padding
           in_x = out_x * stride - padding
           row_idx = 0
@@ -161,8 +161,8 @@ def test_conv2d():
         N, C, H, W = X.shape
         assert (H + 2 * padding - filter_H) % stride == 0
         assert (W + 2 * padding - filter_W) % stride == 0
-        out_H = (H + 2 * padding - filter_H) / stride + 1
-        out_W = (W + 2 * padding - filter_W) / stride + 1
+        out_H = int((H + 2 * padding - filter_H) / stride + 1)
+        out_W = int((W + 2 * padding - filter_W) / stride + 1)
 
         im2col_matrix = im2col(X, filter_H, filter_W, padding, stride)
         filter_matrix = Filter.reshape(filter_outChannel, -1)
@@ -177,7 +177,7 @@ def test_conv2d():
     arr_x = tvm.nd.array(x, ctx=ctx)
     arr_f = tvm.nd.array(f, ctx=ctx)
     arr_y = tvm.nd.array(y, ctx=ctx)
-   
+
     conv2d = tvm_op.make_conv2d(shapeX, shapeF, tgt, tgt_host, "conv2d")
     conv2d(arr_x, arr_f, arr_y)
     y = arr_y.asnumpy()   
@@ -266,3 +266,15 @@ def test_broadcast_to():
     y = arr_y.asnumpy()
     np.testing.assert_allclose(np.broadcast_to(x, to_shape), y)
 
+
+if __name__ == "__main__":
+    # test_matrix_elementwise_add()
+    # test_matrix_elementwise_add_by_const()
+    # test_matrix_elementwise_mul()
+    # test_matrix_elementwise_mul_by_const()
+    # test_relu()
+    # test_relu_gradient()
+    # test_matrix_multiply()
+    # test_conv2d()
+    # test_softmax()
+    test_softmax_cross_entropy()
