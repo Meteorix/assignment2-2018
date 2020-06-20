@@ -130,7 +130,7 @@ def mnist_logreg(executor_ctx, num_epochs=10, print_loss_val_each_epoch=False):
             y_val.copyfrom(
                 convert_to_one_hot(train_set_y[minibatch_start:minibatch_end]))
             loss_val, grad_W1_val, grad_b1_val, _ = executor.run(
-                feed_dict = {X: X_val, y_: y_val, W1: W1_val, b1: b1_val})
+                feed_dict={X: X_val, y_: y_val, W1: W1_val, b1: b1_val})
             # SGD update
             # W1_val = W1_val - lr * grad_W1_val
             # b1_val = b1_val - lr * grad_b1_val
@@ -326,13 +326,13 @@ def mnist_mlp(executor_ctx=None, num_epochs=10,
     # validation set accuracy=0.970800
     print("Validation set accuracy = %f" % accuracy)
     print("Average Time per Training Epoch = %f s" % np.mean(time_measurements))
-    
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "-m", "--model",
-        help="Choose model: all, logreg, mlp", default="all")
+        help="Choose model: all, logreg, mlp", default="mlp")
     parser.add_argument(
         "-c", "--executor_context",
         help="Choose executor context: cpu, gpu", default="cpu")
@@ -341,7 +341,7 @@ if __name__ == "__main__":
         help="Provide number of epochs to train.", type=int, default=10)
     parser.add_argument(
         "-l", "--print_loss_val_each_epoch",
-        help="Print loss value at the end of each epoch", action="store_true")
+        help="Print loss value at the end of each epoch", action="store_true", default=True)
     args = parser.parse_args()
 
     models = []

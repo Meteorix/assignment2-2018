@@ -183,30 +183,30 @@ def make_matrix_softmax_cross_entropy(shape, tgt, tgt_host, func_name,
 
 
 def make_reduce_sum_axis_zero(shape, tgt, tgt_host, func_name, dtype="float32"):
-    A = tvm.placeholder(shape, dtype=dtype, name="A")
+    A = te.placeholder(shape, dtype=dtype, name="A")
     C = topi.sum(A, axis=0, keepdims=False)
 
-    s = tvm.create_schedule(C.op)
+    s = te.create_schedule(C.op)
     f = tvm.build(s, [A, C], tgt, target_host=tgt_host, name=func_name)
     return f
 
 
 def make_broadcast_to(shape, to_shape, tgt, tgt_host, func_name,
                       dtype="float32"):
-    A = tvm.placeholder(shape, dtype=dtype, name="A")
+    A = te.placeholder(shape, dtype=dtype, name="A")
     C = topi.broadcast_to(A, to_shape)
 
-    s = tvm.create_schedule(C.op)
+    s = te.create_schedule(C.op)
     f = tvm.build(s, [A, C], tgt, target_host=tgt_host, name=func_name)
     return f
 
 
 def make_sgd_update(shape, learning_rate, tgt, tgt_host, func_name,
                     dtype="float32"):
-    X = tvm.placeholder(shape, dtype=dtype, name="A")
-    grad = tvm.placeholder(shape, dtype=dtype, name="grad")
-    Y = tvm.compute(shape, lambda *i: X(*i) - learning_rate * grad(*i))
+    X = te.placeholder(shape, dtype=dtype, name="A")
+    grad = te.placeholder(shape, dtype=dtype, name="grad")
+    Y = te.compute(shape, lambda *i: X(*i) - learning_rate * grad(*i))
 
-    s = tvm.create_schedule(Y.op)
+    s = te.create_schedule(Y.op)
     f = tvm.build(s, [X, grad, Y], tgt, target_host=tgt_host, name=func_name)
     return f

@@ -3,6 +3,7 @@ from __future__ import absolute_import
 
 import numpy as np
 import tvm
+from tvm import te
 from . import tvm_op
 
 class Node(object):
@@ -220,7 +221,7 @@ class MulByConstOp(Op):
 
     def compute(self, node, input_vals, output_val, compiled_func):
         assert len(input_vals) == 1
-        compiled_func(input_vals[0], output_val)  
+        compiled_func(input_vals[0], output_val)
 
     def gradient(self, node, output_grad):
         return [node.const_attr * output_grad]
@@ -231,7 +232,7 @@ class MulByConstOp(Op):
 
     def compiled_func(self, node, input_shapes, tgt, tgt_host):
         """TODO: Your code here"""
-        return tvm_op.make_elemwise_mul(input_shapes[0], tgt, tgt_host, "elem_mul_by_const")
+        return tvm_op.make_elemwise_mul_by_const(input_shapes[0], node.const_attr, tgt, tgt_host, "elem_mul_by_const")
 
 class MatMulOp(Op):
     def __call__(self, node_A, node_B, trans_A=False, trans_B=False):
@@ -282,13 +283,13 @@ class MatMulOp(Op):
         aw, ah = input_shapes[0]
         bw, bh = input_shapes[1]
         if not node.matmul_attr_trans_A and not node.matmul_attr_trans_B:
-            return [aw, bh]
+            return (aw, bh)
         if node.matmul_attr_trans_A and not node.matmul_attr_trans_B:
-            return [ah, bh]
+            return (ah, bh)
         if not node.matmul_attr_trans_A and node.matmul_attr_trans_B:
-            return [aw, bw]
+            return (aw, bw)
         if node.matmul_attr_trans_A and node.matmul_attr_trans_B:
-            return [ah, bw]
+            return (ah, bw)
 
     def compiled_func(self, node, input_shapes, tgt, tgt_host):
         """TODO: Your code here"""
@@ -566,10 +567,10 @@ class Executor(object):
         else:
             assert False, "non-CPU context not yet supported"
         self.topo_order = find_topo_sort(self.eval_node_list)
-        self.node_to_shape_map = None
-        self.node_to_arr_map = None
-        self.node_to_compiled_func = None
-        self.feed_shapes = None
+        self.node_to_shape_map = {}
+        self.node_to_arr_map = {}
+        self.node_to_compiled_func = {}
+        self.feed_shapes = {}
 
     def infer_shape(self, feed_shapes):
         """Given shapes of feed_dict nodes, infer shape for all nodes in graph.
@@ -583,6 +584,15 @@ class Executor(object):
         feed_shapes: node->shapes mapping for feed_dict nodes.
         """
         """TODO: Your code here"""
+        for node in feed_shapes:
+            self.node_to_shape_map[node] = feed_shapes[node]
+
+        for node in self.topo_order:
+            input_shapes = [self.node_to_shape_map[n] for n in node.inputs]
+            if not input_shapes:
+                continue
+            node_shape = node.op.infer_shape(node, input_shapes)
+            self.node_to_shape_map[node] = node_shape
 
     def memory_plan(self, feed_shapes):
         """Allocates tvm.nd.array for every node except feed_dict nodes.
@@ -598,6 +608,11 @@ class Executor(object):
         feed_shapes: node->shapes mapping for feed_dict nodes.
         """
         """TODO: Your code here"""
+        for node in self.node_to_shape_map:
+            if node in feed_shapes:
+                continue
+            node_shape = self.node_to_shape_map[node]
+            self.node_to_arr_map[node] = tvm.nd.array(np.zeros(node_shape, dtype="float32"), ctx=self.ctx)
 
     def compile_funcs(self, feed_shapes):
         """Compile tvm ops to native code.
@@ -610,6 +625,12 @@ class Executor(object):
         feed_shapes: node->shapes mapping for feed_dict nodes.
         """
         """TODO: Your code here"""
+        for node in self.node_to_shape_map:
+            if node in feed_shapes:
+                continue
+            node_shape = self.node_to_shape_map[node]
+            input_shapes = [self.node_to_shape_map[n] for n in node.inputs]
+            self.node_to_compiled_func[node] = node.op.compiled_func(node, input_shapes, self.tgt, self.tgt_host)
 
     def run(self, feed_dict, convert_to_numpy_ret_vals=False):
         """
@@ -630,7 +651,7 @@ class Executor(object):
 
         node_to_val_map = {}
         for node, value in feed_dict.items():
-            assert isinstance(value, tvm.ndarray.NDArray),\
+            assert isinstance(value, tvm.nd.NDArray),\
                 "feed_dict value type not supported"    
             node_to_val_map[node] = value
 
