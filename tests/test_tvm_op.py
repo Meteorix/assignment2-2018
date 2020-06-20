@@ -1,6 +1,7 @@
 import numpy as np
 import tvm
 from dlsys import autodiff, tvm_op
+from time import time
 
 tgt_host="llvm"
 tgt="llvm"
@@ -268,13 +269,15 @@ def test_broadcast_to():
 
 
 if __name__ == "__main__":
+    s = time()
     # test_matrix_elementwise_add()
     # test_matrix_elementwise_add_by_const()
     # test_matrix_elementwise_mul()
     # test_matrix_elementwise_mul_by_const()
     # test_relu()
     # test_relu_gradient()
-    # test_matrix_multiply()
+    test_matrix_multiply()
     # test_conv2d()
     # test_softmax()
-    test_softmax_cross_entropy()
+    # test_softmax_cross_entropy()
+    print(time() - s)

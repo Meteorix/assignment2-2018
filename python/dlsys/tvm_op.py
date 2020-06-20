@@ -101,7 +101,17 @@ def make_matrix_mul(shapeA, transposeA, shapeB, transposeB, tgt, tgt_host,
         C = te.compute((shapeA[1], shapeB[0]), lambda i, j: te.sum(A[k, i] * B[j, k], axis=k))
 
     s = te.create_schedule(C.op)
+
+    bn = 32
+    xo, yo, xi, yi = s[C].tile(C.op.axis[0], C.op.axis[1], bn, bn)
+    k, = s[C].op.reduce_axis
+    ko, ki = s[C].split(k, factor=4)
+    s[C].reorder(xo, yo, ko, xi, ki, yi)
+    s[C].vectorize(yi)
+
     f = tvm.build(s, [A, B, C], tgt, target_host=tgt_host, name=func_name)
+
+    # print(tvm.lower(s, [A, B, C], simple_mode=True))
     return f
 
 def make_conv2d(shapeX, shapeF, tgt, tgt_host, func_name, dtype="float32"):
